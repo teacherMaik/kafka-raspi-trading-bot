@@ -1,0 +1,23 @@
+FROM jupyter/scipy-notebook:latest
+
+# Switch to root to install system-level database drivers
+USER root
+RUN apt-get update && apt-get install -y \
+    libpq-dev \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Switch back to the Jupyter user for safety
+USER jovyan
+
+# Install your research stack inside the container
+# This replaces the need for a local venv
+RUN pip install --no-cache-dir \
+    psycopg2-binary \
+    kafka-python-ng \
+    python-dotenv \
+    xgboost \
+    statsmodels \
+    yfinance
+
+WORKDIR /home/jovyan/work

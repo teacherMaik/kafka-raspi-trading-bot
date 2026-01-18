@@ -1,0 +1,23 @@
+FROM apache/spark:3.5.0
+
+USER root
+
+# Install Python and pip
+RUN apt-get update && \
+    apt-get install -y python3-pip && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install Spark/Postgres dependencies
+COPY requirements-process.txt .
+RUN pip3 install --no-cache-dir -r requirements-process.txt
+
+# Download the essential Kafka-Spark connector
+ADD https://repo1.maven.org/maven2/org/apache/spark/spark-sql-kafka-0-10_2.12/3.5.0/spark-sql-kafka-0-10_2.12-3.5.0.jar /opt/spark/jars/
+
+COPY . .
+
+# Run the spark job
+CMD ["/opt/spark/bin/spark-submit", "--packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0", "spark-process.py"]

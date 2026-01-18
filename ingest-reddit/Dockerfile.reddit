@@ -1,0 +1,18 @@
+FROM python:3.11-slim
+
+# Install system dependencies for Kafka and Python
+RUN apt-get update && apt-get install -y \
+    gcc \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy requirements first to leverage Docker cache
+COPY requirements-reddit.txt .
+RUN pip install --no-cache-dir -r requirements-reddit.txt
+
+# Copy the rest of the code
+COPY . .
+
+CMD ["python", "scraper-reddit.py"]

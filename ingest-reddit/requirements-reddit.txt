@@ -1,0 +1,4 @@
+praw
+kafka-python-ng
+python-dotenv
+vaderSentiment

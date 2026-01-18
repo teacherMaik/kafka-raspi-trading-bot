@@ -1,3 +1,0 @@
-praw==7.7.1
-kafka-python-ng==2.2.2
-python-dotenv==1.0.0

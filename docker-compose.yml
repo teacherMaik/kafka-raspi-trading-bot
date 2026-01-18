@@ -1,9 +1,7 @@
 version: '3.8'
 
 services:
-  # ==========================================
-  # PI SERVICES (Run these on the Pi)
-  # ==========================================
+  # PI SERVICES (Edge Ingestion)
   kafka:
     image: apache/kafka:latest
     container_name: kafka-broker
@@ -13,29 +11,36 @@ services:
       - KAFKA_NODE_ID=1
       - KAFKA_PROCESS_ROLES=broker,controller
       - KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
-      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://192.168.1.147:9092  # Pi's Static IP
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://192.168.1.147:9092 # Update to your Pi's IP
       - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
       - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
       - KAFKA_CONTROLLER_QUORUM_VOTERS=1@localhost:9093
       - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
-      # Memory Optimization for Pi 4
       - KAFKA_HEAP_OPTS=-Xmx512M -Xms512M
     volumes:
       - kafka_data:/var/lib/kafka/data
     restart: always
 
-  ingestion-scraper:
-    build: 
-      context: ./ingestion
+  ingest-reddit:
+    build:
+      context: ./ingest-reddit
+      dockerfile: Dockerfile.reddit
     container_name: reddit-scraper
     depends_on:
       - kafka
     env_file: .env
     restart: always
 
-  # ==========================================
-  # LAPTOP SERVICES (Run these on your Laptop)
-  # ==========================================
+  ingest-technicals:
+    build:
+      context: ./ingest-technicals
+      dockerfile: Dockerfile.tech
+    container_name: technicals-scraper
+    depends_on:
+      - kafka
+    restart: always
+
+  # LAPTOP SERVICES (Core Processing & Research)
   postgres-db:
     image: postgres:15
     container_name: storage-db
@@ -44,22 +49,38 @@ services:
     environment:
       - POSTGRES_USER=pi_user
       - POSTGRES_PASSWORD=masters_pass
-      - POSTGRES_DB=reddit_sentiment
+      - POSTGRES_DB=trading_data
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      # Maps database data to your local trading-data folder
+      - ./trading-data:/var/lib/postgresql/data
+    restart: unless-stopped
 
   spark-analysis:
     build:
       context: ./processing
-      dockerfile: Dockerfile.spark
+      dockerfile: Dockerfile.process
     container_name: spark-processor
     volumes:
       - ./processing:/app
     environment:
-      - KAFKA_BROKER=192.168.1.147:9092  # Points Spark to the Pi
+      - KAFKA_BROKER=192.168.1.147:9092 # Update to your Pi's IP
+      - DATABASE_URL=jdbc:postgresql://postgres-db:5432/trading_data
     depends_on:
       - postgres-db
 
+  trading-predictions:
+    build:
+      context: ./trading-predictions
+      dockerfile: Dockerfile.trading  # Points to your custom file
+    container_name: trading-research
+    ports:
+      - "8888:8888"
+    volumes:
+      # Maps your local notebooks/scripts to the container
+      - ./trading-predictions:/home/jovyan/work
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+    restart: unless-stopped
+
 volumes:
-  kafka_data:    # Persists Reddit data on the Pi
-  postgres_data: # Persists processed sentiment on the Laptop
+  kafka_data:
